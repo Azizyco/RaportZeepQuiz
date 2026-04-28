@@ -189,6 +189,15 @@ tbody tr:hover { background:#f0f9ff !important; }
 .btn-primary { background:var(--dark); color:#fff; }
 .btn-secondary { background:#e2e8f0; color:#0f172a; }
 .status-text { font-size:12px; color:var(--muted); margin-top:8px; }
+.save-toast {
+  position:fixed; top:16px; right:16px; z-index:1200;
+  background:#0f172a; color:#fff; padding:10px 14px; border-radius:10px;
+  box-shadow:0 8px 24px rgba(15,23,42,.25); font-size:12px; font-weight:600;
+  display:none; max-width:360px;
+}
+.save-toast.show { display:block; }
+.save-toast.success { background:#047857; }
+.save-toast.error { background:#b91c1c; }
 
 @media (max-width:768px) {
   .toolbar { flex-direction:column; align-items:stretch; }
@@ -296,6 +305,7 @@ tbody tr:hover { background:#f0f9ff !important; }
 <div class="modal-bg" id="modalBg">
   <div class="modal" id="modalContent"></div>
 </div>
+<div id="rankingSaveToast" class="save-toast"></div>
 
 <script>
 // ================================================================
@@ -415,6 +425,7 @@ let sortKey = "acc", sortAsc = false, currentTab = "ranking";
 const editState = {};
 let rankingProfileTableMissing = false;
 let rankingStatusTimer = null;
+let rankingToastTimer = null;
 
 // Load saved edits from localStorage
 function loadState() {
@@ -1072,12 +1083,23 @@ function showQuestionText(index){
 
 function setRankingStatus(msg, type){
   const el = document.getElementById("rankingSaveStatus");
-  if(!el) return;
-  el.textContent = msg || "";
-  el.style.color = type==="success" ? "#047857" : type==="error" ? "#b91c1c" : "var(--muted)";
+  if(el){
+    el.textContent = msg || "";
+    el.style.color = type==="success" ? "#047857" : type==="error" ? "#b91c1c" : "var(--muted)";
+  }
+  const toast = document.getElementById("rankingSaveToast");
+  if(toast){
+    toast.textContent = msg || "";
+    toast.className = `save-toast show ${type==="success"?"success":type==="error"?"error":""}`.trim();
+    if(rankingToastTimer) clearTimeout(rankingToastTimer);
+    rankingToastTimer = setTimeout(()=>{
+      toast.className = "save-toast";
+      toast.textContent = "";
+    }, 5000);
+  }
   if(rankingStatusTimer) clearTimeout(rankingStatusTimer);
   rankingStatusTimer = setTimeout(()=>{
-    el.textContent = "";
+    if(el) el.textContent = "";
   }, 7000);
 }
 
