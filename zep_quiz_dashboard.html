@@ -377,6 +377,18 @@ const Q_LABELS = [
   "Mudah mengingat","Semangat belajar","Ingin pakai lagi",
   "Berpikir cepat & cermat","Kompetisi sehat","Mudah & tidak bingung","Lebih efektif"
 ];
+const Q_FULL_LABELS = [
+  "1. Bermain quiz di ZEP membuat saya lebih aktif dalam menjawab pertanyaan dibanding mengerjakan soal di kertas.",
+  "2. Fitur interaktif dalam ZEP Quiz (skor, peringkat, waktu) membuat proses belajar terasa lebih seru.",
+  "3. Mengerjakan soal quiz di ZEP membantu saya lebih memahami materi perundungan digital yang sudah dipelajari.",
+  "4. Saya merasa lebih mudah mengingat materi setelah mengerjakan quiz secara langsung di ZEP.",
+  "5. Saya merasa lebih bersemangat belajar ketika menggunakan ZEP Quiz dibanding metode pembelajaran biasa.",
+  "6. Saya ingin menggunakan ZEP Quiz lagi untuk mempelajari materi pelajaran yang lain.",
+  "7. ZEP Quiz mendorong saya untuk berpikir lebih cepat dan cermat saat menjawab pertanyaan.",
+  "8. Bermain quiz bersama teman di ZEP membuat saya belajar untuk berkompetisi secara sehat.",
+  "9. Mengerjakan soal quiz di ZEP terasa mudah dan tidak membingungkan.",
+  "10. Menurut saya, belajar menggunakan game berbasis browser seperti ZEP lebih efektif dibanding hanya mendengarkan penjelasan guru."
+];
 
 const INDICATORS = [
   {name:"A. Interaktivitas",qs:[0,1],color:"#3b82f6"},
@@ -768,13 +780,13 @@ function renderQuestionnaire() {
     <tr>
       <th>Nama</th>
       <th>Absen</th>
-      ${Q_LABELS.map((_,i)=>`<th>K${i+1}</th>`).join("")}
+      ${Q_LABELS.map((_,i)=>`<th style="cursor:pointer" onclick="showQuestionText(${i})" title="Klik untuk lihat pertanyaan lengkap">K${i+1}</th>`).join("")}
       <th>Saran</th>
     </tr>
     <tr>
       <th></th>
       <th></th>
-      ${Q_LABELS.map(label=>`<th style="font-size:9px;font-weight:500;color:var(--muted);text-transform:none;letter-spacing:0;cursor:pointer" onclick="showQuestionText('${esc(label)}')" title="Klik untuk lihat pertanyaan lengkap">${esc(label)}</th>`).join("")}
+      ${Q_FULL_LABELS.map((label,i)=>`<th style="font-size:9px;font-weight:500;color:var(--muted);text-transform:none;letter-spacing:0;cursor:pointer" onclick="showQuestionText(${i})" title="Klik untuk lihat pertanyaan lengkap">${esc(label)}</th>`).join("")}
       <th></th>
     </tr>`;
   document.getElementById("qReviewHead").innerHTML = head;
@@ -949,8 +961,10 @@ async function initQuestionnaire() {
   }
 }
 
-function showQuestionText(text){
-  alert(text);
+function showQuestionText(index){
+  const question = Q_FULL_LABELS[index] || "";
+  if(!question) return;
+  alert(question);
 }
 
 // ================================================================
