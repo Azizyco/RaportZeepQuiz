@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZEP Quiz Report — Perundungan Digital</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --bg: #f1f5f9; --surface: #ffffff; --dark: #0f172a; --dark2: #1e293b;
+  --muted: #64748b; --border: #e2e8f0; --accent: #e94560;
+  --green: #10b981; --blue: #3b82f6; --amber: #f59e0b; --red: #ef4444;
+  --purple: #7c3aed; --mono: 'JetBrains Mono', monospace;
+  --sans: 'DM Sans', 'Segoe UI', sans-serif;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: var(--sans); background: var(--bg); color: var(--dark); min-height:100vh; }
+
+.header {
+  background: linear-gradient(135deg, #0f172a, #1e293b 50%, #334155);
+  padding: 24px; border-bottom: 3px solid var(--accent);
+}
+.header-inner { max-width:1400px; margin:0 auto; }
+.header h1 { font-size:22px; font-weight:700; color:#f1f5f9; display:flex; align-items:center; gap:10px; }
+.header p { font-size:13px; color:#94a3b8; margin-top:4px; }
+
+.container { max-width:1400px; margin:0 auto; padding:20px 16px 60px; }
+
+/* STAT CARDS */
+.stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:20px; }
+.stat-card {
+  background: var(--surface); border-radius:12px; padding:16px 14px;
+  box-shadow:0 1px 3px rgba(0,0,0,.06); border-left:4px solid var(--blue);
+}
+.stat-card .label { font-size:11px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.5px; }
+.stat-card .value { font-size:26px; font-weight:700; color:var(--dark); margin-top:4px; font-family:var(--mono); }
+
+/* TOOLBAR */
+.toolbar {
+  display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:16px;
+}
+.tabs {
+  display:flex; gap:3px; background:#e2e8f0; border-radius:10px; padding:3px;
+}
+.tab-btn {
+  padding:8px 16px; border-radius:8px; border:none; cursor:pointer;
+  font-size:13px; font-weight:600; font-family:var(--sans);
+  background:transparent; color:var(--muted); transition:all .2s;
+}
+.tab-btn.active { background:var(--surface); color:var(--dark); box-shadow:0 1px 3px rgba(0,0,0,.1); }
+
+.search-input {
+  padding:9px 14px; border-radius:10px; border:1px solid var(--border);
+  font-size:13px; width:260px; outline:none; font-family:var(--sans);
+}
+.search-input:focus { border-color:var(--blue); }
+
+/* EXPORT DROPDOWN */
+.export-wrap { position:relative; margin-left:auto; }
+.export-btn {
+  padding:9px 18px; border-radius:10px; border:none; cursor:pointer;
+  font-size:13px; font-weight:600; font-family:var(--sans);
+  background:var(--dark); color:#fff; display:flex; align-items:center; gap:6px;
+}
+.export-btn:hover { background:#334155; }
+.export-menu {
+  display:none; position:absolute; top:42px; right:0; background:var(--surface);
+  border-radius:12px; box-shadow:0 8px 30px rgba(0,0,0,.15); min-width:280px;
+  z-index:100; overflow:hidden; border:1px solid var(--border);
+}
+.export-menu.open { display:block; }
+.export-menu h4 { padding:12px 16px 8px; font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
+.export-option {
+  padding:10px 16px; cursor:pointer; font-size:13px; display:flex; align-items:center; gap:10px;
+  border:none; background:none; width:100%; text-align:left; font-family:var(--sans);
+}
+.export-option:hover { background:#f0f9ff; }
+.export-option .icon { font-size:18px; }
+.export-option .desc { font-size:11px; color:var(--muted); }
+.export-divider { height:1px; background:var(--border); margin:4px 0; }
+
+/* TABLE */
+.table-wrap {
+  background:var(--surface); border-radius:14px;
+  box-shadow:0 1px 4px rgba(0,0,0,.06); overflow:hidden;
+}
+.table-scroll { overflow-x:auto; }
+table { width:100%; border-collapse:collapse; font-size:12px; }
+thead th {
+  padding:11px 8px; text-align:center; color:var(--muted); font-weight:600;
+  font-size:10px; white-space:nowrap; background:#f8fafc; border-bottom:2px solid var(--border);
+  position:sticky; top:0; cursor:pointer; user-select:none; text-transform:uppercase; letter-spacing:.3px;
+}
+thead th:hover { background:#eef2f7; }
+tbody td { padding:8px 6px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+tbody tr:nth-child(even) { background:#fafbfc; }
+tbody tr:hover { background:#f0f9ff !important; }
+
+.edit-input {
+  padding:5px 7px; border:1px solid var(--border); border-radius:6px;
+  font-size:11px; outline:none; font-family:var(--sans); color:var(--dark); transition:border .2s;
+}
+.edit-input:focus { border-color:var(--blue); }
+.edit-input.filled { background:#f0fdf4; }
+.edit-input.filled-blue { background:#eff6ff; }
+.edit-input.absen { width:44px; text-align:center; font-weight:600; }
+.edit-input.name { width:140px; }
+.edit-input.saran { width:160px; font-size:10px; }
+.edit-input[readonly] { background:#f8fafc; color:#94a3b8; cursor:not-allowed; }
+
+.row-actions { display:flex; gap:6px; justify-content:center; }
+.row-btn {
+  padding:4px 8px; border-radius:8px; border:1px solid var(--border);
+  font-size:10px; font-weight:700; background:#fff; cursor:pointer;
+}
+.row-btn.primary { background:#0f172a; color:#fff; border-color:#0f172a; }
+.row-btn.danger { background:#fef2f2; color:#b91c1c; border-color:#fecaca; }
+
+/* ANSWER BADGES */
+.ans { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:4px; font-size:10px; font-weight:700; }
+.ans.ok { background:#dcfce7; color:#16a34a; }
+.ans.no { background:#fee2e2; color:#dc2626; }
+
+/* LIKERT BADGES */
+.lk { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:5px; font-size:11px; font-weight:700; font-family:var(--mono); }
+.lk-4 { background:#dcfce7; color:#047857; }
+.lk-3 { background:#eff6ff; color:#1d4ed8; }
+.lk-2 { background:#fffbeb; color:#b45309; }
+.lk-1 { background:#fef2f2; color:#b91c1c; }
+
+/* BADGES */
+.badge { padding:3px 10px; border-radius:20px; font-size:10px; font-weight:700; white-space:nowrap; }
+.badge-green { background:#ecfdf5; color:#047857; }
+.badge-blue { background:#eff6ff; color:#1d4ed8; }
+.badge-amber { background:#fffbeb; color:#b45309; }
+.badge-red { background:#fef2f2; color:#b91c1c; }
+
+.medal { display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%; font-weight:800; font-size:12px; }
+.medal-1 { background:#FFD700; color:#7c2d12; box-shadow:0 2px 6px #FFD70066; }
+.medal-2 { background:#C0C0C0; color:#fff; box-shadow:0 2px 6px #C0C0C066; }
+.medal-3 { background:#CD7F32; color:#fff; box-shadow:0 2px 6px #CD7F3266; }
+.medal-n { font-family:var(--mono); color:#94a3b8; font-size:12px; font-weight:700; width:26px; text-align:center; }
+
+.accuracy { font-family:var(--mono); font-weight:700; font-size:14px; }
+
+/* ANALYSIS PANEL */
+.analysis-panel { background:var(--surface); border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.06); padding:24px; }
+.bar-row { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+.bar-label { font-family:var(--mono); font-size:12px; font-weight:700; color:var(--muted); width:28px; text-align:right; }
+.bar-track { flex:1; height:26px; background:#f1f5f9; border-radius:7px; overflow:hidden; position:relative; }
+.bar-fill { height:100%; border-radius:7px; display:flex; align-items:center; justify-content:flex-end; padding-right:8px; transition:width .8s ease; }
+.bar-fill span { font-size:10px; font-weight:700; color:#fff; }
+.bar-pct { font-family:var(--mono); font-size:12px; font-weight:700; width:40px; text-align:right; }
+.bar-tag { font-size:10px; font-weight:600; width:70px; }
+
+.dist-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:10px; }
+.dist-card { border-radius:10px; padding:14px 10px; text-align:center; }
+.dist-card .num { font-size:28px; font-weight:800; font-family:var(--mono); }
+.dist-card .lbl { font-size:11px; font-weight:600; color:var(--muted); }
+
+/* MODAL */
+.modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.5); display:none; align-items:center; justify-content:center; z-index:999; padding:16px; }
+.modal-bg.open { display:flex; }
+.modal { background:var(--surface); border-radius:16px; padding:28px; max-width:560px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,.2); max-height:90vh; overflow-y:auto; }
+
+.note-box { padding:14px; border-radius:10px; margin-top:20px; font-size:12px; line-height:1.6; }
+.note-amber { background:#fffbeb; border:1px solid #fef3c7; color:#78350f; }
+
+/* QUESTIONNAIRE ANALYSIS */
+.q-indicator { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; }
+.q-ind-card { background:var(--surface); border-radius:12px; padding:16px; border-left:4px solid var(--blue); }
+.q-ind-card h4 { font-size:12px; color:var(--muted); margin-bottom:6px; }
+.q-ind-card .score { font-size:28px; font-weight:800; font-family:var(--mono); }
+
+.csv-input {
+  width:100%; min-height:160px; padding:10px 12px; border-radius:10px;
+  border:1px solid var(--border); font-size:12px; font-family:var(--mono);
+  background:#fff; outline:none; resize:vertical;
+}
+.csv-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+.btn {
+  padding:8px 14px; border-radius:10px; border:none; cursor:pointer;
+  font-size:12px; font-weight:600; font-family:var(--sans);
+}
+.btn-primary { background:var(--dark); color:#fff; }
+.btn-secondary { background:#e2e8f0; color:#0f172a; }
+.status-text { font-size:12px; color:var(--muted); margin-top:8px; }
+
+@media (max-width:768px) {
+  .toolbar { flex-direction:column; align-items:stretch; }
+  .search-input { width:100%; }
+  .export-wrap { margin-left:0; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <h1>🎮 ZEP Quiz Report</h1>
+    <p>Memahami Dampak Perundungan Digital — Kelas 8 SMP &nbsp;|&nbsp; 28 April 2026</p>
+  </div>
+</div>
+
+<div class="container">
+  <div class="stats-grid" id="statsGrid"></div>
+
+  <div class="toolbar">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="ranking">🏅 Ranking & Data</button>
+      <button class="tab-btn" data-tab="analysis">📈 Analisis Soal</button>
+      <button class="tab-btn" data-tab="questionnaire">📋 Kuesioner</button>
+    </div>
+    <input class="search-input" id="searchInput" placeholder="🔍 Cari nama siswa...">
+    <div class="export-wrap">
+      <button class="export-btn" id="exportToggle">📥 Export ▾</button>
+      <div class="export-menu" id="exportMenu">
+        <h4>Export Seluruh Data</h4>
+        <button class="export-option" onclick="exportExcel('full')">
+          <span class="icon">📊</span>
+          <div><strong>Excel — Semua Data</strong><div class="desc">Quiz + Kuesioner + Saran</div></div>
+        </button>
+        <button class="export-option" onclick="exportPDF('full')">
+          <span class="icon">📄</span>
+          <div><strong>PDF — Semua Data</strong><div class="desc">Quiz + Kuesioner + Saran</div></div>
+        </button>
+        <div class="export-divider"></div>
+        <h4>Export Tanpa Kuesioner (untuk Guru)</h4>
+        <button class="export-option" onclick="exportExcel('quiz')">
+          <span class="icon">📊</span>
+          <div><strong>Excel — Data Quiz Saja</strong><div class="desc">Nama, Absen, Nilai, Jawaban</div></div>
+        </button>
+        <button class="export-option" onclick="exportPDF('quiz')">
+          <span class="icon">📄</span>
+          <div><strong>PDF — Data Quiz Saja</strong><div class="desc">Nama, Absen, Nilai, Jawaban</div></div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RANKING TAB -->
+  <div id="tab-ranking" class="tab-content">
+    <div class="table-wrap"><div class="table-scroll">
+      <table id="mainTable">
+        <thead><tr id="tableHead"></tr></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div></div>
+  </div>
+
+  <!-- ANALYSIS TAB -->
+  <div id="tab-analysis" class="tab-content" style="display:none">
+    <div class="analysis-panel">
+      <h3 style="margin-bottom:4px;font-size:17px;">Analisis Per Soal</h3>
+      <p style="margin-bottom:18px;font-size:12px;color:var(--muted)">Persentase siswa yang menjawab benar</p>
+      <div id="questionBars"></div>
+      <div class="note-box note-amber" id="questionNote" style="margin-top:20px"></div>
+      <h3 style="margin:28px 0 12px;font-size:15px;">Distribusi Nilai</h3>
+      <div class="dist-grid" id="distGrid"></div>
+    </div>
+  </div>
+
+  <!-- QUESTIONNAIRE TAB -->
+  <div id="tab-questionnaire" class="tab-content" style="display:none">
+    <div class="analysis-panel">
+      <h3 style="margin-bottom:4px;font-size:17px;">Hasil Kuesioner — Skala Likert 4 Titik</h3>
+      <p style="margin-bottom:18px;font-size:12px;color:var(--muted)">Rata-rata skor per indikator dari <span id="respCount"></span> responden</p>
+      <div class="q-indicator" id="qIndicators"></div>
+      <h3 style="margin:28px 0 12px;font-size:15px;">Rata-rata Per Pernyataan</h3>
+      <div id="qBars"></div>
+      <h3 style="margin:28px 0 12px;font-size:15px;">Input Manual Kuesioner (CSV)</h3>
+      <p style="margin-bottom:10px;font-size:12px;color:var(--muted)">
+        Tempel data CSV di bawah ini, lalu klik <strong>Gunakan Data CSV</strong>. Anda bisa menyimpan ke Supabase.
+      </p>
+      <textarea id="qCsvInput" class="csv-input" placeholder="Tempel CSV kuesioner di sini..."></textarea>
+      <div class="csv-actions">
+        <button class="btn btn-primary" onclick="applyCsvInput()">Gunakan Data CSV</button>
+        <button class="btn btn-secondary" onclick="saveQuestionnaireToSupabase()">Simpan ke Supabase</button>
+        <button class="btn btn-secondary" onclick="loadQuestionnaireFromSupabase()">Muat dari Supabase</button>
+      </div>
+      <div class="status-text" id="qStatus"></div>
+      <h3 style="margin:28px 0 12px;font-size:15px;">Saran & Masukan Siswa</h3>
+      <div id="saranList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- DETAIL MODAL -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal" id="modalContent"></div>
+</div>
+
+<script>
+// ================================================================
+// DATA
+// ================================================================
+const QUIZ_DATA = [
+  {zep:"Bogi 07",acc:50,cor:5,time:"1m 32d",sub:"12:59:39",ans:["X","X","X","✓","X","X","✓","✓","✓","✓"],sec:[3,7,10,22,6,14,9,9,4,3]},
+  {zep:"21.",acc:20,cor:2,time:"1m 41d",sub:"12:59:49",ans:["X","X","X","X","X","✓","✓","X","X","X"],sec:[4,9,7,22,13,9,7,8,9,9]},
+  {zep:"Diwangga 11",acc:70,cor:7,time:"3m 9d",sub:"13:01:16",ans:["X","✓","X","✓","✓","X","✓","✓","✓","✓"],sec:[5,20,14,32,41,13,22,18,12,8]},
+  {zep:"rafa 13",acc:80,cor:8,time:"1m 58d",sub:"13:00:20",ans:["X","✓","✓","✓","✓","X","✓","✓","✓","✓"],sec:[5,13,9,21,10,7,15,16,6,11]},
+  {zep:"Rafi/22",acc:70,cor:7,time:"2m 19d",sub:"13:00:26",ans:["X","✓","X","✓","✓","X","✓","✓","✓","✓"],sec:[5,15,11,37,8,15,21,7,7,9]},
+  {zep:"nad☆19",acc:90,cor:9,time:"1m 37d",sub:"12:59:45",ans:["✓","✓","✓","✓","✓","X","✓","✓","✓","✓"],sec:[6,9,9,14,9,10,12,9,8,7]},
+  {zep:"afr ahay 05",acc:80,cor:8,time:"1m 42d",sub:"12:59:49",ans:["✓","✓","✓","✓","X","X","✓","✓","✓","✓"],sec:[8,9,7,13,8,10,22,6,8,8]},
+  {zep:"alfin 3",acc:90,cor:9,time:"1m 37d",sub:"12:59:45",ans:["X","✓","✓","✓","✓","✓","✓","✓","✓","✓"],sec:[7,14,5,12,13,6,12,9,5,10]},
+  {zep:"Septi 27",acc:10,cor:1,time:"4m 41d",sub:"13:02:54",ans:["X","✓","X","X","X","X","X","X","X","X"],sec:[3,34,22,59,26,15,47,15,13,42]},
+  {zep:"nabila/17",acc:100,cor:10,time:"4m 6d",sub:"13:02:12",ans:["✓","✓","✓","✓","✓","✓","✓","✓","✓","✓"],sec:[9,12,15,56,39,35,26,23,17,10]},
+  {zep:"alfian (02)",acc:70,cor:7,time:"3m 1d",sub:"13:01:08",ans:["X","✓","✓","✓","X","X","✓","✓","✓","✓"],sec:[9,14,11,55,9,13,34,10,9,13]},
+  {zep:"06 ratutu",acc:90,cor:9,time:"3m 27d",sub:"13:01:35",ans:["✓","✓","✓","✓","✓","X","✓","✓","✓","✓"],sec:[10,11,7,122,10,11,12,6,8,7]},
+  {zep:"dina 10",acc:90,cor:9,time:"3m 14d",sub:"13:01:23",ans:["✓","✓","✓","✓","✓","X","✓","✓","✓","✓"],sec:[9,9,15,81,12,10,27,6,10,9]},
+  {zep:"Kinan 15",acc:100,cor:10,time:"5m 0d",sub:"13:03:09",ans:["✓","✓","✓","✓","✓","✓","✓","✓","✓","✓"],sec:[10,14,18,148,24,25,18,11,10,16]},
+  {zep:"RENAAAAAAAAA25",acc:80,cor:8,time:"2m 40d",sub:"13:00:48",ans:["X","✓","✓","✓","✓","X","✓","✓","✓","✓"],sec:[12,20,14,36,12,14,20,8,6,13]},
+  {zep:"cindyy 09",acc:100,cor:10,time:"3m 41d",sub:"13:01:49",ans:["✓","✓","✓","✓","✓","✓","✓","✓","✓","✓"],sec:[12,12,13,70,9,20,57,9,7,8]},
+  {zep:"laras/29",acc:100,cor:10,time:"3m 21d",sub:"13:03:16",ans:["✓","✓","✓","✓","✓","✓","✓","✓","✓","✓"],sec:[12,13,15,60,17,13,26,16,14,11]},
+  {zep:"kai (12)",acc:80,cor:8,time:"2m 45d",sub:"13:00:52",ans:["✓","✓","X","✓","✓","X","✓","✓","✓","✓"],sec:[14,9,10,34,7,27,28,13,7,11]},
+  {zep:"aliyaa 04",acc:90,cor:9,time:"3m 6d",sub:"13:01:14",ans:["✓","✓","✓","✓","✓","X","✓","✓","✓","✓"],sec:[13,12,10,50,10,9,37,14,8,20]},
+  {zep:"18 Aqila",acc:100,cor:10,time:"3m 11d",sub:"13:01:20",ans:["✓","✓","✓","✓","✓","✓","✓","✓","✓","✓"],sec:[13,12,12,71,10,19,17,11,9,12]},
+  {zep:"jackal",acc:80,cor:8,time:"3m 46d",sub:"13:05:52",ans:["✓","✓","✓","✓","X","X","✓","✓","✓","✓"],sec:[13,9,9,97,11,21,38,9,8,8]},
+  {zep:"inez_14",acc:50,cor:5,time:"6m 44d",sub:"13:04:51",ans:["X","✓","X","X","X","X","✓","✓","✓","✓"],sec:[15,18,20,187,17,64,16,40,16,6]},
+  {zep:"20 naomiii",acc:90,cor:9,time:"3m 52d",sub:"13:02:02",ans:["✓","✓","✓","✓","✓","X","✓","✓","✓","✓"],sec:[13,12,13,110,8,17,20,12,8,13]},
+  {zep:"tiwi/31",acc:90,cor:9,time:"4m 47d",sub:"13:02:56",ans:["✓","✓","✓","✓","✓","X","✓","✓","✓","✓"],sec:[15,13,15,90,24,35,33,24,9,24]},
+  {zep:"acha_08",acc:90,cor:9,time:"2m 33d",sub:"13:00:41",ans:["✓","✓","✓","✓","✓","X","✓","✓","✓","✓"],sec:[18,9,10,30,13,10,16,9,18,15]},
+  {zep:"akbar tungkak1",acc:80,cor:8,time:"2m 45d",sub:"13:00:54",ans:["X","✓","✓","X","✓","✓","✓","✓","✓","✓"],sec:[17,18,12,38,12,19,13,7,7,18]},
+  {zep:"Raka 23",acc:80,cor:8,time:"3m 3d",sub:"13:01:13",ans:["✓","✓","X","✓","✓","X","✓","✓","✓","✓"],sec:[17,9,16,48,15,15,19,21,7,12]},
+  {zep:"shintaa 28",acc:70,cor:7,time:"4m 3d",sub:"13:02:11",ans:["X","X","✓","✓","✓","X","✓","✓","✓","✓"],sec:[22,44,41,25,21,24,18,9,21,15]},
+  {zep:"Vinsa 30",acc:70,cor:7,time:"6m 22d",sub:"13:04:31",ans:["X","✓","✓","✓","✓","X","X","✓","✓","✓"],sec:[34,45,25,119,28,45,38,13,12,19]},
+  {zep:"Amaa 17",acc:100,cor:10,time:"6m 31d",sub:"13:04:59",ans:["✓","✓","✓","✓","✓","✓","✓","✓","✓","✓"],sec:[22,29,21,93,47,54,25,19,42,34]},
+  {zep:"Jackie 25",acc:60,cor:6,time:"2m 13d",sub:"13:01:01",ans:["X","✓","✓","✓","X","X","✓","X","✓","✓"],sec:[5,14,14,38,8,12,11,6,12,8]},
+];
+
+const SUPABASE_URL = "https://crbvfwjbjldqazvnmfmb.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNyYnZmd2piamxkcWF6dm5tZm1iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNTY5ODYsImV4cCI6MjA5MjkzMjk4Nn0.OV0JsCmcaa8CLgdUTL6lava_721fvBMMnaOYiaL_tnw";
+const QUESTIONNAIRE_TABLE = "kuesioner_pemanfaatan_game_online_berbasis_browser_sebagai_media_edukasi_jawaban";
+const QUESTIONNAIRE_SCHEMA = "public";
+const supabaseClient = window.supabase ? window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY,
+  { db: { schema: QUESTIONNAIRE_SCHEMA } }
+) : null;
+
+const DEFAULT_Q_CSV = `Timestamp,Nama Lengkap,Nomor absen,1. Bermain quiz di ZEP membuat saya lebih aktif dalam menjawab pertanyaan dibanding mengerjakan soal di kertas.,"2. Fitur interaktif dalam ZEP Quiz (skor, peringkat, waktu) membuat proses belajar terasa lebih seru.",3. Mengerjakan soal quiz di ZEP membantu saya lebih memahami materi perundungan digital yang sudah dipelajari.,4. Saya merasa lebih mudah mengingat materi setelah mengerjakan quiz secara langsung di ZEP.,5. Saya merasa lebih bersemangat belajar ketika menggunakan ZEP Quiz dibanding metode pembelajaran biasa.,6. Saya ingin menggunakan ZEP Quiz lagi untuk mempelajari materi pelajaran yang lain.,7. ZEP Quiz mendorong saya untuk berpikir lebih cepat dan cermat saat menjawab pertanyaan.,8. Bermain quiz bersama teman di ZEP membuat saya belajar untuk berkompetisi secara sehat.,9. Mengerjakan soal quiz di ZEP terasa mudah dan tidak membingungkan.,"10. Menurut saya, belajar menggunakan game berbasis browser seperti ZEP lebih efektif dibanding hanya mendengarkan penjelasan guru.",Apakah ada saran atau masukan untuk pembelajaran menggunakan ZEP Quiz?
+28/04/2026 13:08:48,sakhi aulia renata,26,Setuju (3),Setuju (3),Tidak Setuju (2),Tidak Setuju (2),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),
+28/04/2026 13:09:28,Khairunnisa Rahma Kinanthi ,15,Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),-
+28/04/2026 13:09:39,RASYA ARYA PANGESTU ,25,Sangat Tidak Setuju (1),Sangat Tidak Setuju (1),Sangat Tidak Setuju (1),Sangat Tidak Setuju (1),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Tidak ada 
+28/04/2026 13:10:02,IKHWAN RAFA ABQORI ,13,Sangat Setuju (4),Sangat Setuju (4),Setuju (3),Sangat Setuju (4),Setuju (3),Sangat Setuju (4),Setuju (3),Sangat Setuju (4),Setuju (3),Sangat Setuju (4),
+28/04/2026 13:10:04,Syakina Larasati Alya Pranindita ,29,Tidak Setuju (2),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Tidak Setuju (2),
+28/04/2026 13:10:04,Aliya Saqina W.,04,Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),Setuju (3),Sangat Setuju (4),Setuju (3),Sangat Setuju (4),Setuju (3),Setuju (3),Setuju (3),
+28/04/2026 13:10:03,Vinsa Andaresta ,30,Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),Setuju (3),
+28/04/2026 13:10:08,Alfin putra paramaditya ,3,Setuju (3),Sangat Setuju (4),Sangat Setuju (4),Setuju (3),Setuju (3),Setuju (3),Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),
+28/04/2026 13:10:10,Bogi prabangkara sakti,7,Sangat Setuju (4),Sangat Setuju (4),Setuju (3),Sangat Setuju (4),Setuju (3),Sangat Setuju (4),Setuju (3),Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),
+28/04/2026 13:10:20,Cindy Aulia Cahyani,09,Setuju (3),Sangat Setuju (4),Sangat Setuju (4),Setuju (3),Setuju (3),Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),Tidak Setuju (2),-
+28/04/2026 13:10:30,Inez kinanthi,14,Setuju (3),Setuju (3),Setuju (3),Setuju (3),Sangat Setuju (4),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),"kalau mau buat game jangan yang susah susah kayak tadi, tapi game nya bagus "
+28/04/2026 13:10:32,Callia Achazia Husna,08,Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),Setuju (3),Setuju (3),Sangat Setuju (4),Sangat Setuju (4),Setuju (3),Setuju (3),Setuju (3),"jangan ada jembatannya kak, susah nyebrangnya lho🙂🙂"
+28/04/2026 13:10:44,Nadine Kusuma Atmaja ,19,Sangat Setuju (4),Setuju (3),Sangat Setuju (4),Sangat Setuju (4),Setuju (3),Setuju (3),Sangat Setuju (4),Setuju (3),Sangat Setuju (4),Setuju (3),
+28/04/2026 13:10:49,akbar hidayat ramadhan,1,Setuju (3),Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),sudah keren
+28/04/2026 13:10:59,nabila cahaya dewi,17,Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),
+28/04/2026 13:11:51,Shinta zahra al qur'ani,28,Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),
+28/04/2026 13:11:58,zahra pertiwi ,31,Setuju (3),Sangat Setuju (4),Sangat Setuju (4),Setuju (3),Sangat Setuju (4),Setuju (3),Sangat Setuju (4),Setuju (3),Setuju (3),Sangat Setuju (4),
+28/04/2026 13:12:00,Dina Harnitasari ,10,Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Sangat Setuju (4),Sangat Setuju (4),Setuju (3),Setuju (3),
+28/04/2026 13:12:01,Alfian Abdur Rohman,02,Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),Setuju (3),Setuju (3),Setuju (3),Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),
+28/04/2026 13:12:01,RENAAAAAAAAAAAAAAA AZZAHRAAAA,25,Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),Tidak Setuju (2),Setuju (3),
+28/04/2026 13:12:09,Nadia Aqila Nufah,18,Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),Sangat Setuju (4),Setuju (3),Sangat Setuju (4),Sangat Setuju (4),Setuju (3),sinyal nya aja sih 
+28/04/2026 13:12:25,Rafi Baihaqi,22,Sangat Setuju (4),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),-
+28/04/2026 13:12:26,Ayunda Ratu,06,Setuju (3),Setuju (3),Setuju (3),Setuju (3),Tidak Setuju (2),Setuju (3),Sangat Setuju (4),Sangat Setuju (4),Setuju (3),Setuju (3),-
+28/04/2026 13:13:26,RAKA BUMI NUGROHO,23,Setuju (3),Setuju (3),Tidak Setuju (2),Tidak Setuju (2),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Tidak Setuju (2),Tidak Setuju (2),grafik nya kebih di tingkatkan
+28/04/2026 13:13:38,Diwangga Bairuny ,11,Sangat Setuju (4),Sangat Setuju (4),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Tidak Setuju (2),bagus
+28/04/2026 13:13:41,Onassisdaiky kedem,21,Setuju (3),Setuju (3),Setuju (3),Setuju (3),Tidak Setuju (2),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),
+28/04/2026 13:14:06,Marhamah Az Zahro ,16,Setuju (3),Setuju (3),Sangat Setuju (4),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),
+28/04/2026 13:14:19,Dzakiyya Nur Azizah,12,Tidak Setuju (2),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Setuju (3),Sangat Setuju (4),Setuju (3),Tidak Setuju (2),"ofc, imo seru sih ✌🏻 tapi balik lagi ke pribadi masing-masing."
+28/04/2026 13:14:24,NAOMI FRISKA MAHARANI,20,Sangat Setuju (4),Setuju (3),Setuju (3),Tidak Setuju (2),Tidak Setuju (2),Setuju (3),Sangat Setuju (4),Setuju (3),Setuju (3),Tidak Setuju (2),saran engga semua orang punya paket data jadi pelajaran menggunakan ZEP Quiz kurang bagi saya
+28/04/2026 13:15:53,Septi,27,Tidak Setuju (2),Tidak Setuju (2),Sangat Setuju (4),Setuju (3),Sangat Tidak Setuju (1),Setuju (3),Sangat Setuju (4),Tidak Setuju (2),Sangat Setuju (4),Setuju (3),Cyiberstallking mengantin pantiutas darly`;
+
+let questionnaireData = [];
+
+const Q_LABELS = [
+  "Lebih aktif menjawab","Fitur interaktif seru","Memahami materi",
+  "Mudah mengingat","Semangat belajar","Ingin pakai lagi",
+  "Berpikir cepat & cermat","Kompetisi sehat","Mudah & tidak bingung","Lebih efektif"
+];
+
+const INDICATORS = [
+  {name:"A. Interaktivitas",qs:[0,1],color:"#3b82f6"},
+  {name:"B. Kognitif",qs:[2,3],color:"#10b981"},
+  {name:"C. Motivasi",qs:[4,5],color:"#f59e0b"},
+  {name:"D. Abad 21",qs:[6,7],color:"#7c3aed"},
+  {name:"E. Efektivitas",qs:[8,9],color:"#e94560"},
+];
+
+// ================================================================
+// STATE
+// ================================================================
+let students = QUIZ_DATA.map((d,i)=>({...d,id:i,fullName:"",absen:"",
+  qScores:Array(10).fill(0),qSaran:""}));
+let sortKey = "acc", sortAsc = false, currentTab = "ranking";
+const editState = {};
+
+// Load saved edits from localStorage
+function loadState() {
+  try {
+    const s = JSON.parse(localStorage.getItem("zep_edits")||"{}");
+    students.forEach(st => {
+      if(s[st.id]) Object.assign(st, s[st.id]);
+    });
+  } catch(e){}
+}
+function saveState() {
+  const s = {};
+  students.forEach(st => {
+    s[st.id] = {fullName:st.fullName, absen:st.absen, qScores:st.qScores, qSaran:st.qSaran};
+  });
+  localStorage.setItem("zep_edits", JSON.stringify(s));
+}
+loadState();
+
+// ================================================================
+// HELPERS
+// ================================================================
+function gradeInfo(acc) {
+  if(acc>=90) return {bg:"#ecfdf5",text:"#047857",cls:"badge-green",label:"Sangat Baik"};
+  if(acc>=70) return {bg:"#eff6ff",text:"#1d4ed8",cls:"badge-blue",label:"Baik"};
+  if(acc>=50) return {bg:"#fffbeb",text:"#b45309",cls:"badge-amber",label:"Cukup"};
+  return {bg:"#fef2f2",text:"#b91c1c",cls:"badge-red",label:"Perlu Perbaikan"};
+}
+
+function normalizeName(s){ return (s||"").toLowerCase().replace(/\s+/g," ").trim(); }
+function normalizeAbsen(s){ return (s||"").toString().trim().replace(/^0+/,""); }
+function getQuestionnaireForStudent(st){
+  const absenKey = normalizeAbsen(st.absen);
+  if(absenKey){
+    const byAbsen = questionnaireData.find(r=>normalizeAbsen(r.absen)===absenKey);
+    if(byAbsen) return byAbsen;
+  }
+  const nameKeys = [st.fullName, st.zep].map(normalizeName).filter(Boolean);
+  return questionnaireData.find(r=>nameKeys.includes(normalizeName(r.nama))) || null;
+}
+function getQuestionnaireSummary(st){
+  const r = getQuestionnaireForStudent(st);
+  if(!r) return {qScores:[], avg:null, saran:""};
+  const qScores = (r.q||[]).map(v=>Number(v)||0);
+  const avg = qScores.length ? (qScores.reduce((a,b)=>a+b,0)/10) : null;
+  return {qScores, avg, saran: r.saran||""};
+}
+
+function getRanked() {
+  return [...students].sort((a,b)=>b.acc!==a.acc?b.acc-a.acc:a.time.localeCompare(b.time)).map((s,i)=>({...s,rank:i+1}));
+}
+
+function medalHtml(rank) {
+  if(rank<=3) return `<span class="medal medal-${rank}">${rank}</span>`;
+  return `<span class="medal-n">${rank}</span>`;
+}
+
+// ================================================================
+// RENDER STATS
+// ================================================================
+function renderStats() {
+  const accs = students.map(s=>s.acc);
+  const avg = (accs.reduce((a,b)=>a+b,0)/accs.length).toFixed(1);
+  const cards = [
+    {label:"Rata-rata",value:avg+"%",icon:"📊",color:"#3b82f6"},
+    {label:"Tertinggi",value:Math.max(...accs)+"%",icon:"🏆",color:"#10b981"},
+    {label:"Terendah",value:Math.min(...accs)+"%",icon:"📉",color:"#ef4444"},
+    {label:"Nilai Sempurna",value:students.filter(s=>s.acc===100).length,icon:"⭐",color:"#f59e0b"},
+    {label:"Di Bawah 50%",value:students.filter(s=>s.acc<50).length,icon:"⚠️",color:"#ef4444"},
+    {label:"Total Siswa",value:students.length,icon:"👥",color:"#7c3aed"},
+  ];
+  document.getElementById("statsGrid").innerHTML = cards.map(c=>`
+    <div class="stat-card" style="border-left-color:${c.color}">
+      <div class="label">${c.icon} ${c.label}</div>
+      <div class="value">${c.value}</div>
+    </div>`).join("");
+}
+
+// ================================================================
+// RENDER TABLE
+// ================================================================
+function renderTable() {
+  const search = document.getElementById("searchInput").value.toLowerCase();
+  const ranked = getRanked();
+  let arr = ranked.filter(s => !search ||
+    s.zep.toLowerCase().includes(search) ||
+    s.fullName.toLowerCase().includes(search) ||
+    s.absen.includes(search));
+
+  // Sort
+  arr.sort((a,b)=>{
+    let va=a[sortKey], vb=b[sortKey];
+    if(typeof va==="number") return sortAsc? va-vb : vb-va;
+    if(typeof va==="string") return sortAsc? va.localeCompare(vb) : vb.localeCompare(va);
+    return 0;
+  });
+
+  // HEADER
+  const arrow = (k)=> sortKey===k ? (sortAsc?"↑":"↓") : "⇅";
+  document.getElementById("tableHead").innerHTML = `
+    <th>Rank</th>
+    <th onclick="doSort('zep')">Nama ZEP ${arrow('zep')}</th>
+    <th>Nama Lengkap ✏️</th>
+    <th>No. Absen ✏️</th>
+    <th onclick="doSort('acc')">Akurasi ${arrow('acc')}</th>
+    <th onclick="doSort('cor')">Benar ${arrow('cor')}</th>
+    <th>Waktu</th>
+    ${[...Array(10)].map((_,i)=>`<th>Q${i+1}</th>`).join("")}
+    <th>Kategori</th>
+    <th>Saran ✏️</th>
+    <th>Kuesioner</th>
+    <th>CRUD</th>`;
+
+  // BODY
+  document.getElementById("tableBody").innerHTML = arr.map(s=>{
+    const g = gradeInfo(s.acc);
+    const qInfo = getQuestionnaireSummary(s);
+    const hasQ = qInfo.avg !== null && qInfo.avg > 0;
+    const isEditing = !!(editState[s.id] && editState[s.id].editing);
+    const buf = editState[s.id] || {};
+    const fullNameVal = isEditing ? (buf.fullName ?? s.fullName) : s.fullName;
+    const absenVal = isEditing ? (buf.absen ?? s.absen) : s.absen;
+    const saranVal = isEditing ? (buf.qSaran ?? s.qSaran) : s.qSaran;
+    return `<tr onclick="showDetail(${s.id})" style="cursor:pointer">
+      <td style="text-align:center">${medalHtml(s.rank)}</td>
+      <td style="font-weight:600;white-space:nowrap;max-width:130px;overflow:hidden;text-overflow:ellipsis">${s.zep}</td>
+      <td onclick="event.stopPropagation()">
+        <input class="edit-input name ${fullNameVal?'filled':''}" value="${esc(fullNameVal)}" placeholder="Ketik nama..."
+          ${isEditing?"":"readonly"}
+          oninput="updateEditField(${s.id},'fullName',this.value)" onfocus="this.style.borderColor='#3b82f6'" onblur="this.style.borderColor=''">
+      </td>
+      <td onclick="event.stopPropagation()">
+        <input class="edit-input absen ${absenVal?'filled-blue':''}" value="${esc(absenVal)}" placeholder="—"
+          ${isEditing?"":"readonly"}
+          oninput="updateEditField(${s.id},'absen',this.value)" onfocus="this.style.borderColor='#3b82f6'" onblur="this.style.borderColor=''">
+      </td>
+      <td style="text-align:center"><span class="accuracy" style="color:${g.text}">${s.acc}%</span></td>
+      <td style="text-align:center;font-family:var(--mono);font-weight:600;color:#475569">${s.cor}/10</td>
+      <td style="text-align:center;font-size:11px;color:var(--muted);white-space:nowrap">${s.time}</td>
+      ${s.ans.map(a=>`<td style="text-align:center"><span class="ans ${a==="✓"?"ok":"no"}">${a==="✓"?"✓":"✗"}</span></td>`).join("")}
+      <td style="text-align:center"><span class="badge ${g.cls}">${g.label}</span></td>
+      <td onclick="event.stopPropagation()">
+        <input class="edit-input saran ${saranVal?'filled':''}" value="${esc(saranVal)}" placeholder="—"
+          ${isEditing?"":"readonly"}
+          oninput="updateEditField(${s.id},'qSaran',this.value)">
+      </td>
+      <td style="text-align:center">
+        ${hasQ ? `<span style="font-family:var(--mono);font-size:12px;font-weight:700;color:#047857">${qInfo.avg.toFixed(1)}</span>` :
+        `<span style="font-size:10px;color:var(--muted)">—</span>`}
+      </td>
+      <td onclick="event.stopPropagation()">
+        <div class="row-actions">
+          ${isEditing ? `
+            <button class="row-btn primary" onclick="saveEdit(${s.id})">Simpan</button>
+            <button class="row-btn" onclick="cancelEdit(${s.id})">Batal</button>
+          ` : `
+            <button class="row-btn primary" onclick="startEdit(${s.id})">Input/Edit</button>
+            <button class="row-btn danger" onclick="deleteEdit(${s.id})">Hapus</button>
+          `}
+        </div>
+      </td>
+    </tr>`;
+  }).join("");
+}
+
+function esc(s) { return (s||"").replace(/"/g,"&quot;").replace(/</g,"&lt;"); }
+
+function doSort(key) {
+  if(sortKey===key) sortAsc=!sortAsc;
+  else { sortKey=key; sortAsc=false; }
+  renderTable();
+}
+
+function updateField(id, field, value) {
+  students[id][field] = value;
+  saveState();
+  renderTable();
+}
+
+function startEdit(id){
+  if(!editState[id]) editState[id] = { fullName:"", absen:"", qSaran:"" };
+  editState[id].fullName = students[id].fullName || "";
+  editState[id].absen = students[id].absen || "";
+  editState[id].qSaran = students[id].qSaran || "";
+  editState[id].editing = true;
+  renderTable();
+}
+
+function updateEditField(id, field, value){
+  if(!editState[id]) editState[id] = { editing:true, fullName:"", absen:"", qSaran:"" };
+  editState[id][field] = value;
+}
+
+function saveEdit(id){
+  if(!editState[id]) return;
+  const buf = editState[id];
+  students[id].fullName = (buf.fullName||"").trim();
+  students[id].absen = (buf.absen||"").trim();
+  students[id].qSaran = (buf.qSaran||"").trim();
+  editState[id].editing = false;
+  saveState();
+  renderTable();
+}
+
+function cancelEdit(id){
+  if(editState[id]) editState[id].editing = false;
+  renderTable();
+}
+
+function deleteEdit(id){
+  students[id].fullName = "";
+  students[id].absen = "";
+  students[id].qSaran = "";
+  if(editState[id]) editState[id].editing = false;
+  saveState();
+  renderTable();
+}
+
+// ================================================================
+// DETAIL MODAL
+// ================================================================
+function showDetail(id) {
+  const ranked = getRanked();
+  const s = ranked.find(r=>r.id===id);
+  if(!s) return;
+  const g = gradeInfo(s.acc);
+  const qInfo = getQuestionnaireSummary(s);
+  const qTotal = qInfo.qScores.reduce((a,b)=>a+b,0);
+  const hasQ = qTotal > 0;
+
+  document.getElementById("modalContent").innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:16px">
+      <div>
+        <div style="font-size:11px;color:var(--muted);font-weight:600">DETAIL SISWA</div>
+        <h2 style="margin:4px 0 0;font-size:20px;font-weight:700">${s.fullName||s.zep}</h2>
+        ${s.fullName?`<div style="font-size:12px;color:#94a3b8">ZEP: ${s.zep}</div>`:""}
+        ${s.absen?`<div style="font-size:12px;color:#3b82f6;font-weight:600">No. Absen: ${s.absen}</div>`:""}
+      </div>
+      <button onclick="closeModal()" style="background:#f1f5f9;border:none;border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:16px;color:var(--muted)">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:18px">
+      <div style="background:${g.bg};border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:26px;font-weight:800;color:${g.text};font-family:var(--mono)">${s.acc}%</div>
+        <div style="font-size:10px;color:var(--muted);font-weight:600">AKURASI</div>
+      </div>
+      <div style="background:#f8fafc;border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:26px;font-weight:800;font-family:var(--mono)">${s.cor}/10</div>
+        <div style="font-size:10px;color:var(--muted);font-weight:600">BENAR</div>
+      </div>
+      <div style="background:#f8fafc;border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:26px;font-weight:800;font-family:var(--mono)">#${s.rank}</div>
+        <div style="font-size:10px;color:var(--muted);font-weight:600">PERINGKAT</div>
+      </div>
+    </div>
+    <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px">JAWABAN PER SOAL</div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:7px">
+      ${s.ans.map((a,i)=>`<div style="border-radius:8px;padding:8px 6px;text-align:center;background:${a==="✓"?"#dcfce7":"#fee2e2"};border:1px solid ${a==="✓"?"#bbf7d0":"#fecaca"}">
+        <div style="font-size:9px;color:var(--muted);font-weight:600">Q${i+1}</div>
+        <div style="font-size:16px;font-weight:800;color:${a==="✓"?"#16a34a":"#dc2626"}">${a==="✓"?"✓":"✗"}</div>
+        <div style="font-size:9px;color:#94a3b8">${s.sec[i]}dtk</div>
+      </div>`).join("")}
+    </div>
+    ${hasQ ? `
+    <div style="font-size:12px;font-weight:600;color:var(--muted);margin:16px 0 8px">SKOR KUESIONER</div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:7px">
+      ${qInfo.qScores.map((v,i)=>`<div style="border-radius:8px;padding:8px 6px;text-align:center;background:#f8fafc">
+        <div style="font-size:9px;color:var(--muted);font-weight:600">K${i+1}</div>
+        <div class="lk lk-${v}" style="margin:4px auto;font-size:14px">${v}</div>
+      </div>`).join("")}
+    </div>
+    <div style="margin-top:8px;padding:8px 12px;background:#f8fafc;border-radius:8px;display:flex;justify-content:space-between;font-size:12px">
+      <span style="color:var(--muted)">Rata-rata Kuesioner</span>
+      <span style="font-weight:700;font-family:var(--mono)">${(qTotal/10).toFixed(2)}</span>
+    </div>`:""}
+    ${qInfo.saran && qInfo.saran!=="-" ? `<div style="margin-top:8px;padding:8px 12px;background:#fffbeb;border-radius:8px;font-size:12px"><strong>Saran:</strong> ${esc(qInfo.saran)}</div>` : ""}
+    <div style="margin-top:12px;padding:8px 12px;background:#f8fafc;border-radius:8px;display:flex;justify-content:space-between;font-size:12px">
+      <span style="color:var(--muted)">Total Waktu</span>
+      <span style="font-weight:700">${s.time}</span>
+    </div>`;
+
+  document.getElementById("modalBg").classList.add("open");
+}
+function closeModal() { document.getElementById("modalBg").classList.remove("open"); }
+
+// ================================================================
+// ANALYSIS TAB
+// ================================================================
+function renderAnalysis() {
+  const total = students.length;
+  const qStats = [];
+  for(let q=0;q<10;q++){
+    const correct = students.filter(s=>s.ans[q]==="✓").length;
+    const pct = Math.round(100*correct/total);
+    qStats.push({q:q+1, correct, pct});
+  }
+
+  const barColor = p => p>=80?"#10b981":p>=60?"#3b82f6":p>=40?"#f59e0b":"#ef4444";
+  const barTag = p => p>=80?"Mudah":p>=60?"Sedang":p>=40?"Sulit":"Sangat Sulit";
+  const tagColor = p => p>=80?"#047857":p>=60?"#1d4ed8":p>=40?"#b45309":"#b91c1c";
+
+  document.getElementById("questionBars").innerHTML = qStats.map(q=>`
+    <div class="bar-row">
+      <span class="bar-label">Q${q.q}</span>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:${q.pct}%;background:${barColor(q.pct)}">
+          ${q.pct>=20?`<span>${q.correct}/${total}</span>`:""}
+        </div>
+      </div>
+      <span class="bar-pct" style="color:${barColor(q.pct)}">${q.pct}%</span>
+      <span class="bar-tag" style="color:${tagColor(q.pct)}">${barTag(q.pct)}</span>
+    </div>`).join("");
+
+  const hardQs = qStats.filter(q=>q.pct<50);
+  document.getElementById("questionNote").innerHTML = hardQs.length>0 ?
+    `<strong>💡 Soal yang Perlu Diperhatikan:</strong> ${hardQs.map(q=>"Q"+q.q).join(", ")} memiliki tingkat jawaban benar di bawah 50%.` :
+    `<strong>💡</strong> Semua soal memiliki tingkat jawaban benar di atas 50%. Siswa memahami materi dengan baik.`;
+
+  const dists = [
+    {label:"90–100%",range:[90,100],color:"#10b981",bg:"#ecfdf5"},
+    {label:"70–80%",range:[70,89],color:"#3b82f6",bg:"#eff6ff"},
+    {label:"50–60%",range:[50,69],color:"#f59e0b",bg:"#fffbeb"},
+    {label:"< 50%",range:[0,49],color:"#ef4444",bg:"#fef2f2"},
+  ];
+  document.getElementById("distGrid").innerHTML = dists.map(d=>{
+    const count = students.filter(s=>s.acc>=d.range[0]&&s.acc<=d.range[1]).length;
+    return `<div class="dist-card" style="background:${d.bg}">
+      <div class="num" style="color:${d.color}">${count}</div>
+      <div class="lbl">${d.label}</div>
+      <div style="font-size:10px;color:#94a3b8">siswa</div>
+    </div>`;
+  }).join("");
+}
+
+// ================================================================
+// QUESTIONNAIRE TAB
+// ================================================================
+function renderQuestionnaire() {
+  const QD = questionnaireData;
+  document.getElementById("respCount").textContent = QD.length;
+  if(QD.length===0){
+    document.getElementById("qIndicators").innerHTML = `<div style="font-size:12px;color:var(--muted)">Belum ada data kuesioner.</div>`;
+    document.getElementById("qBars").innerHTML = `<div style="font-size:12px;color:var(--muted)">Belum ada data kuesioner.</div>`;
+    document.getElementById("saranList").innerHTML = `<p style="color:var(--muted);font-size:13px">Tidak ada saran yang diberikan.</p>`;
+    return;
+  }
+
+  // Indicators
+  document.getElementById("qIndicators").innerHTML = INDICATORS.map(ind=>{
+    const avg = QD.reduce((sum,r)=> sum + ind.qs.reduce((s,qi)=>s+r.q[qi],0)/ind.qs.length, 0) / QD.length;
+    return `<div class="q-ind-card" style="border-left-color:${ind.color}">
+      <h4>${ind.name}</h4>
+      <div class="score" style="color:${ind.color}">${avg.toFixed(2)}</div>
+      <div style="font-size:10px;color:var(--muted)">dari 4.00</div>
+    </div>`;
+  }).join("");
+
+  // Per-question bars
+  document.getElementById("qBars").innerHTML = Q_LABELS.map((label,i)=>{
+    const avg = QD.reduce((s,r)=>s+r.q[i],0)/QD.length;
+    const pct = (avg/4)*100;
+    const color = avg>=3.5?"#10b981":avg>=3.0?"#3b82f6":avg>=2.5?"#f59e0b":"#ef4444";
+    return `<div class="bar-row">
+      <span class="bar-label" style="width:22px">K${i+1}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"><span>${avg.toFixed(2)}</span></div></div>
+      <span style="font-size:10px;color:var(--muted);width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${label}</span>
+    </div>`;
+  }).join("");
+
+  // Saran list
+  const sarans = QD.filter(r=>r.saran&&r.saran!=="-"&&r.saran.toLowerCase()!=="tidak ada"&&r.saran.length>2);
+  document.getElementById("saranList").innerHTML = sarans.length>0 ?
+    sarans.map(r=>`<div style="padding:10px 14px;background:#f8fafc;border-radius:8px;margin-bottom:8px;font-size:12px;border-left:3px solid #f59e0b">
+      <strong>${r.nama}</strong> <span style="color:var(--muted)">(Absen ${r.absen})</span><br>${esc(r.saran)}
+    </div>`).join("") :
+    `<p style="color:var(--muted);font-size:13px">Tidak ada saran yang diberikan.</p>`;
+}
+
+// ================================================================
+// QUESTIONNAIRE INPUT (CSV + SUPABASE)
+// ================================================================
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let cur = "";
+  let inQuotes = false;
+  for(let i=0;i<text.length;i++){
+    const c = text[i];
+    if(c === '"'){
+      if(inQuotes && text[i+1] === '"'){ cur += '"'; i++; }
+      else inQuotes = !inQuotes;
+    } else if(c === ',' && !inQuotes){
+      row.push(cur); cur = "";
+    } else if((c === '\n' || c === '\r') && !inQuotes){
+      if(c === '\r' && text[i+1] === '\n') i++;
+      row.push(cur);
+      if(row.some(cell => cell.trim() !== "")) rows.push(row);
+      row = []; cur = "";
+    } else {
+      cur += c;
+    }
+  }
+  if(cur.length>0 || row.length>0){
+    row.push(cur);
+    if(row.some(cell => cell.trim() !== "")) rows.push(row);
+  }
+  return rows;
+}
+
+function parseLikertValue(v) {
+  const m = String(v||"").match(/(\d)/);
+  return m ? Number(m[1]) : 0;
+}
+
+function parseQuestionnaireCsv(text) {
+  const rows = parseCsv(text);
+  if(rows.length<=1) return [];
+  const data = [];
+  for(let i=1;i<rows.length;i++){
+    const r = rows[i];
+    if(!r[1]) continue;
+    const q = [];
+    for(let qi=3; qi<=12; qi++){
+      q.push(parseLikertValue(r[qi]));
+    }
+    data.push({
+      timestamp: (r[0]||"").trim(),
+      nama: (r[1]||"").trim(),
+      absen: (r[2]||"").trim(),
+      q,
+      saran: (r[13]||"").trim()
+    });
+  }
+  return data;
+}
+
+function applyCsvInput() {
+  const text = document.getElementById("qCsvInput").value;
+  questionnaireData = parseQuestionnaireCsv(text);
+  renderQuestionnaire();
+  setQStatus(`Data CSV dipakai. Total responden: ${questionnaireData.length}.`);
+}
+
+function setQStatus(msg, isError) {
+  const el = document.getElementById("qStatus");
+  el.textContent = msg;
+  el.style.color = isError ? "#b91c1c" : "var(--muted)";
+}
+
+async function loadQuestionnaireFromSupabase() {
+  if(!supabaseClient){
+    setQStatus("Supabase belum tersedia.", true);
+    return;
+  }
+  const { data, error } = await supabaseClient
+    .schema(QUESTIONNAIRE_SCHEMA)
+    .from(QUESTIONNAIRE_TABLE)
+    .select("*")
+    .order("timestamp", { ascending: true });
+  if(error){
+    if(error.status===404){
+      setQStatus("Tabel kuesioner tidak ditemukan di Supabase. Pastikan SQL schema sudah dijalankan dan tabel ada di schema public.", true);
+    } else {
+      setQStatus(`Gagal memuat dari Supabase: ${error.message}`, true);
+    }
+    return;
+  }
+  questionnaireData = (data||[]).map(r=>({
+    timestamp: r.timestamp || "",
+    nama: r.nama_lengkap || "",
+    absen: r.nomor_absen || "",
+    q: [r.q1,r.q2,r.q3,r.q4,r.q5,r.q6,r.q7,r.q8,r.q9,r.q10].map(v=>Number(v)||0),
+    saran: r.saran || ""
+  }));
+  renderQuestionnaire();
+  renderTable();
+  setQStatus(`Data kuesioner dimuat dari Supabase. Total responden: ${questionnaireData.length}.`);
+}
+
+async function saveQuestionnaireToSupabase() {
+  if(!supabaseClient){
+    setQStatus("Supabase belum tersedia.", true);
+    return;
+  }
+  if(questionnaireData.length===0){
+    setQStatus("Tidak ada data untuk disimpan.", true);
+    return;
+  }
+  const payload = questionnaireData.map(r=>({
+    timestamp: r.timestamp,
+    nama_lengkap: r.nama,
+    nomor_absen: r.absen,
+    q1: r.q[0], q2: r.q[1], q3: r.q[2], q4: r.q[3], q5: r.q[4],
+    q6: r.q[5], q7: r.q[6], q8: r.q[7], q9: r.q[8], q10: r.q[9],
+    saran: r.saran
+  }));
+  const { error } = await supabaseClient
+    .schema(QUESTIONNAIRE_SCHEMA)
+    .from(QUESTIONNAIRE_TABLE)
+    .upsert(payload, { onConflict: "timestamp,nama_lengkap,nomor_absen" });
+  if(error){
+    if(error.status===404){
+      setQStatus("Tabel kuesioner tidak ditemukan di Supabase. Pastikan SQL schema sudah dijalankan dan tabel ada di schema public.", true);
+    } else {
+      setQStatus(`Gagal menyimpan ke Supabase: ${error.message}`, true);
+    }
+    return;
+  }
+  setQStatus("Data kuesioner berhasil disimpan ke Supabase.");
+}
+
+async function initQuestionnaire() {
+  const input = document.getElementById("qCsvInput");
+  if(input) input.value = DEFAULT_Q_CSV;
+  await loadQuestionnaireFromSupabase();
+  if(questionnaireData.length===0){
+    questionnaireData = parseQuestionnaireCsv(DEFAULT_Q_CSV);
+    renderQuestionnaire();
+    renderTable();
+    setQStatus(`Data lokal dipakai. Total responden: ${questionnaireData.length}.`);
+  }
+}
+
+// ================================================================
+// EXPORT — EXCEL
+// ================================================================
+function exportExcel(mode) {
+  closeExportMenu();
+  const ranked = getRanked();
+  const wb = XLSX.utils.book_new();
+
+  if(mode==="full") {
+    // Sheet 1: Full data
+    const headers = ["Rank","Nama ZEP","Nama Lengkap","No Absen","Akurasi (%)","Benar","Total Waktu",
+      ...Array.from({length:10},(_,i)=>`Q${i+1}`),"Kategori",
+      ...Array.from({length:10},(_,i)=>`Kuesioner K${i+1}`),"Rata-rata Kuesioner","Saran"];
+    const rows = ranked.map(s=>{
+      const qInfo = getQuestionnaireSummary(s);
+      const qAvg = qInfo.avg!==null ? qInfo.avg.toFixed(2) : "";
+      const qScores = qInfo.qScores.length ? qInfo.qScores : Array(10).fill("");
+      return [
+      s.rank, s.zep, s.fullName, s.absen, s.acc, s.cor, s.time,
+      ...s.ans.map(a=>a==="✓"?"Benar":"Salah"), gradeInfo(s.acc).label,
+      ...qScores, qAvg, qInfo.saran
+    ];
+    });
+    const ws = XLSX.utils.aoa_to_sheet([headers,...rows]);
+    ws['!cols'] = headers.map((_,i)=>({wch: i<=2?20:i<=6?12:8}));
+    XLSX.utils.book_append_sheet(wb, ws, "Data Lengkap");
+  } else {
+    // Quiz only
+    const headers = ["Rank","Nama ZEP","Nama Lengkap","No Absen","Akurasi (%)","Benar","Total Waktu",
+      ...Array.from({length:10},(_,i)=>`Q${i+1}`),"Kategori"];
+    const rows = ranked.map(s=>[
+      s.rank, s.zep, s.fullName, s.absen, s.acc, s.cor, s.time,
+      ...s.ans.map(a=>a==="✓"?"Benar":"Salah"), gradeInfo(s.acc).label
+    ]);
+    const ws = XLSX.utils.aoa_to_sheet([headers,...rows]);
+    ws['!cols'] = headers.map((_,i)=>({wch: i<=2?20:i<=6?12:8}));
+    XLSX.utils.book_append_sheet(wb, ws, "Data Quiz");
+  }
+
+  XLSX.writeFile(wb, mode==="full"?"ZEP_Report_Lengkap.xlsx":"ZEP_Report_Quiz.xlsx");
+}
+
+// ================================================================
+// EXPORT — PDF
+// ================================================================
+function exportPDF(mode) {
+  closeExportMenu();
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({orientation:"landscape", unit:"mm", format:"a4"});
+  const ranked = getRanked();
+
+  doc.setFontSize(16);
+  doc.text("ZEP Quiz Report — Perundungan Digital", 14, 15);
+  doc.setFontSize(10);
+  doc.setTextColor(100);
+  doc.text(`Kelas 8 SMP | 28 April 2026 | ${students.length} siswa`, 14, 21);
+  doc.setTextColor(0);
+
+  if(mode==="full") {
+    const headers = [["Rank","Nama","Absen","Akurasi","Benar","Waktu","Q1","Q2","Q3","Q4","Q5","Q6","Q7","Q8","Q9","Q10","Kategori","Avg K","Saran"]];
+    const rows = ranked.map(s=>{
+      const qInfo = getQuestionnaireSummary(s);
+      const qAvg = qInfo.avg!==null ? qInfo.avg.toFixed(1) : "—";
+      return [
+      s.rank, s.fullName||s.zep, s.absen, s.acc+"%", s.cor+"/10", s.time,
+      ...s.ans.map(a=>a==="✓"?"✓":"✗"), gradeInfo(s.acc).label,
+      qAvg,
+      (qInfo.saran||"").substring(0,30)
+    ];
+    });
+    doc.autoTable({head:headers, body:rows, startY:26, styles:{fontSize:7,cellPadding:1.5}, headStyles:{fillColor:[15,23,42]}, columnStyles:{0:{cellWidth:8},1:{cellWidth:28}}});
+  } else {
+    const headers = [["Rank","Nama Lengkap","No Absen","Akurasi","Benar","Waktu","Q1","Q2","Q3","Q4","Q5","Q6","Q7","Q8","Q9","Q10","Kategori"]];
+    const rows = ranked.map(s=>[
+      s.rank, s.fullName||s.zep, s.absen, s.acc+"%", s.cor+"/10", s.time,
+      ...s.ans.map(a=>a==="✓"?"✓":"✗"), gradeInfo(s.acc).label
+    ]);
+    doc.autoTable({head:headers, body:rows, startY:26, styles:{fontSize:7.5,cellPadding:2}, headStyles:{fillColor:[15,23,42]}, columnStyles:{0:{cellWidth:10},1:{cellWidth:35},2:{cellWidth:12}}});
+  }
+
+  doc.save(mode==="full"?"ZEP_Report_Lengkap.pdf":"ZEP_Report_Quiz.pdf");
+}
+
+// ================================================================
+// TABS & EVENTS
+// ================================================================
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll(".tab-btn").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));
+  document.querySelectorAll(".tab-content").forEach(el=>el.style.display="none");
+  document.getElementById("tab-"+tab).style.display="block";
+  if(tab==="analysis") renderAnalysis();
+  if(tab==="questionnaire") renderQuestionnaire();
+}
+
+function closeExportMenu() { document.getElementById("exportMenu").classList.remove("open"); }
+
+// INIT
+document.querySelectorAll(".tab-btn").forEach(b=>b.addEventListener("click",()=>switchTab(b.dataset.tab)));
+document.getElementById("searchInput").addEventListener("input", renderTable);
+document.getElementById("exportToggle").addEventListener("click",()=>document.getElementById("exportMenu").classList.toggle("open"));
+document.getElementById("modalBg").addEventListener("click",(e)=>{if(e.target===e.currentTarget)closeModal()});
+document.addEventListener("click",(e)=>{
+  if(!e.target.closest(".export-wrap")) closeExportMenu();
+});
+document.addEventListener("keydown",(e)=>{if(e.key==="Escape"){closeModal();closeExportMenu();}});
+
+renderStats();
+renderTable();
+initQuestionnaire();
+</script>
+</body>
+</html>
