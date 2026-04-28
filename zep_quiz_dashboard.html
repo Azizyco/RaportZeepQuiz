@@ -272,17 +272,13 @@ tbody tr:hover { background:#f0f9ff !important; }
       <div class="q-indicator" id="qIndicators"></div>
       <h3 style="margin:28px 0 12px;font-size:15px;">Rata-rata Per Pernyataan</h3>
       <div id="qBars"></div>
-      <h3 style="margin:28px 0 12px;font-size:15px;">Input Manual Kuesioner (CSV)</h3>
-      <p style="margin-bottom:10px;font-size:12px;color:var(--muted)">
-        Tempel data CSV di bawah ini, lalu klik <strong>Gunakan Data CSV</strong>. Anda bisa menyimpan ke Supabase.
-      </p>
-      <textarea id="qCsvInput" class="csv-input" placeholder="Tempel CSV kuesioner di sini..."></textarea>
-      <div class="csv-actions">
-        <button class="btn btn-primary" onclick="applyCsvInput()">Gunakan Data CSV</button>
-        <button class="btn btn-secondary" onclick="saveQuestionnaireToSupabase()">Simpan ke Supabase</button>
-        <button class="btn btn-secondary" onclick="loadQuestionnaireFromSupabase()">Muat dari Supabase</button>
-      </div>
-      <div class="status-text" id="qStatus"></div>
+      <h3 style="margin:28px 0 12px;font-size:15px;">Review Data Kuesioner</h3>
+      <div class="table-wrap"><div class="table-scroll">
+        <table id="qReviewTable">
+          <thead id="qReviewHead"></thead>
+          <tbody id="qReviewBody"></tbody>
+        </table>
+      </div></div>
       <h3 style="margin:28px 0 12px;font-size:15px;">Saran & Masukan Siswa</h3>
       <div id="saranList"></div>
     </div>
@@ -739,6 +735,8 @@ function renderQuestionnaire() {
   if(QD.length===0){
     document.getElementById("qIndicators").innerHTML = `<div style="font-size:12px;color:var(--muted)">Belum ada data kuesioner.</div>`;
     document.getElementById("qBars").innerHTML = `<div style="font-size:12px;color:var(--muted)">Belum ada data kuesioner.</div>`;
+    document.getElementById("qReviewHead").innerHTML = "";
+    document.getElementById("qReviewBody").innerHTML = `<tr><td colspan="13" style="text-align:center;color:var(--muted);font-size:12px;padding:14px">Belum ada data kuesioner.</td></tr>`;
     document.getElementById("saranList").innerHTML = `<p style="color:var(--muted);font-size:13px">Tidak ada saran yang diberikan.</p>`;
     return;
   }
@@ -763,6 +761,34 @@ function renderQuestionnaire() {
       <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"><span>${avg.toFixed(2)}</span></div></div>
       <span style="font-size:10px;color:var(--muted);width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${label}</span>
     </div>`;
+  }).join("");
+
+  // Review table
+  const head = `
+    <tr>
+      <th>Nama</th>
+      <th>Absen</th>
+      ${Q_LABELS.map((_,i)=>`<th>K${i+1}</th>`).join("")}
+      <th>Saran</th>
+    </tr>
+    <tr>
+      <th></th>
+      <th></th>
+      ${Q_LABELS.map(label=>`<th style="font-size:9px;font-weight:500;color:var(--muted);text-transform:none;letter-spacing:0;cursor:pointer" onclick="showQuestionText('${esc(label)}')" title="Klik untuk lihat pertanyaan lengkap">${esc(label)}</th>`).join("")}
+      <th></th>
+    </tr>`;
+  document.getElementById("qReviewHead").innerHTML = head;
+  document.getElementById("qReviewBody").innerHTML = QD.map(r=>{
+    const cells = Array.from({length:10},(_,i)=>{
+      const v = Number(r.q[i]) || 0;
+      return v ? `<span class="lk lk-${v}">${v}</span>` : `<span style="color:var(--muted)">—</span>`;
+    });
+    return `<tr>
+      <td style="font-weight:600">${esc(r.nama)}</td>
+      <td style="text-align:center;font-family:var(--mono)">${esc(r.absen)}</td>
+      ${cells.map(c=>`<td style="text-align:center">${c}</td>`).join("")}
+      <td style="font-size:11px">${esc(r.saran||"")}</td>
+    </tr>`;
   }).join("");
 
   // Saran list
@@ -908,15 +934,16 @@ async function saveQuestionnaireToSupabase() {
 }
 
 async function initQuestionnaire() {
-  const input = document.getElementById("qCsvInput");
-  if(input) input.value = DEFAULT_Q_CSV;
   await loadQuestionnaireFromSupabase();
   if(questionnaireData.length===0){
     questionnaireData = parseQuestionnaireCsv(DEFAULT_Q_CSV);
     renderQuestionnaire();
     renderTable();
-    setQStatus(`Data lokal dipakai. Total responden: ${questionnaireData.length}.`);
   }
+}
+
+function showQuestionText(text){
+  alert(text);
 }
 
 // ================================================================
