@@ -72,6 +72,16 @@ CREATE TABLE IF NOT EXISTS kuesioner_pemanfaatan_game_online_berbasis_browser_se
   UNIQUE (timestamp, nama_lengkap, nomor_absen)
 );
 
+-- 5. Tabel profil siswa untuk Ranking & Data (CRUD nama lengkap, absen, saran)
+CREATE TABLE IF NOT EXISTS quiz_student_profiles (
+  id           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  zep_name     TEXT NOT NULL UNIQUE,
+  full_name    TEXT DEFAULT '',
+  nomor_absen  TEXT DEFAULT '',
+  saran        TEXT DEFAULT '',
+  updated_at   TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- ================================================================
 -- INDEXES untuk performa query
 -- ================================================================
@@ -80,6 +90,7 @@ CREATE INDEX idx_quiz_students_absen ON quiz_students(absen);
 CREATE INDEX idx_quiz_answers_student ON quiz_answers(student_id);
 CREATE INDEX idx_questionnaire_student ON questionnaire_responses(student_id);
 CREATE INDEX idx_kuesioner_absen ON kuesioner_pemanfaatan_game_online_berbasis_browser_sebagai_media_edukasi_jawaban(nomor_absen);
+CREATE INDEX idx_quiz_student_profiles_absen ON quiz_student_profiles(nomor_absen);
 
 -- ================================================================
 -- VIEW: Gabungan data lengkap (quiz + kuesioner)

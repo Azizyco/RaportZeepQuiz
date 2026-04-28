@@ -250,6 +250,7 @@ tbody tr:hover { background:#f0f9ff !important; }
         <tbody id="tableBody"></tbody>
       </table>
     </div></div>
+    <div class="status-text" id="rankingSaveStatus" style="margin-top:10px"></div>
   </div>
 
   <!-- ANALYSIS TAB -->
@@ -337,6 +338,7 @@ const QUIZ_DATA = [
 const SUPABASE_URL = "https://crbvfwjbjldqazvnmfmb.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNyYnZmd2piamxkcWF6dm5tZm1iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNTY5ODYsImV4cCI6MjA5MjkzMjk4Nn0.OV0JsCmcaa8CLgdUTL6lava_721fvBMMnaOYiaL_tnw";
 const QUESTIONNAIRE_TABLE = "kuesioner_pemanfaatan_game_online_berbasis_browser_sebagai_media_edukasi_jawaban";
+const PROFILE_TABLE = "quiz_student_profiles";
 const QUESTIONNAIRE_SCHEMA = "public";
 const supabaseClient = window.supabase ? window.supabase.createClient(
   SUPABASE_URL,
@@ -411,6 +413,8 @@ let students = QUIZ_DATA.map((d,i)=>({...d,id:i,fullName:"",absen:"",
   qScores:Array(10).fill(0),qSaran:""}));
 let sortKey = "acc", sortAsc = false, currentTab = "ranking";
 const editState = {};
+let rankingProfileTableMissing = false;
+let rankingStatusTimer = null;
 
 // Load saved edits from localStorage
 function loadState() {
@@ -452,11 +456,12 @@ function getQuestionnaireForStudent(st){
   return questionnaireData.find(r=>nameKeys.includes(normalizeName(r.nama))) || null;
 }
 function getQuestionnaireSummary(st){
+  const manualSaran = (st.qSaran||"").trim();
   const r = getQuestionnaireForStudent(st);
-  if(!r) return {qScores:[], avg:null, saran:""};
+  if(!r) return {qScores:[], avg:null, saran:manualSaran};
   const qScores = (r.q||[]).map(v=>Number(v)||0);
   const avg = qScores.length ? (qScores.reduce((a,b)=>a+b,0)/10) : null;
-  return {qScores, avg, saran: r.saran||""};
+  return {qScores, avg, saran: manualSaran || r.saran || ""};
 }
 
 function getRanked() {
@@ -604,7 +609,7 @@ function updateEditField(id, field, value){
   editState[id][field] = value;
 }
 
-function saveEdit(id){
+async function saveEdit(id){
   if(!editState[id]) return;
   const buf = editState[id];
   students[id].fullName = (buf.fullName||"").trim();
@@ -612,6 +617,8 @@ function saveEdit(id){
   students[id].qSaran = (buf.qSaran||"").trim();
   editState[id].editing = false;
   saveState();
+  const result = await saveRankingEditToSupabase(students[id]);
+  setRankingStatus(result.msg, result.ok ? "success" : "error");
   renderTable();
 }
 
@@ -620,12 +627,14 @@ function cancelEdit(id){
   renderTable();
 }
 
-function deleteEdit(id){
+async function deleteEdit(id){
   students[id].fullName = "";
   students[id].absen = "";
   students[id].qSaran = "";
   if(editState[id]) editState[id].editing = false;
   saveState();
+  const result = await deleteRankingEditFromSupabase(students[id]);
+  setRankingStatus(result.msg, result.ok ? "success" : "error");
   renderTable();
 }
 
@@ -958,7 +967,95 @@ async function saveQuestionnaireToSupabase() {
   setQStatus("Data kuesioner berhasil disimpan ke Supabase.");
 }
 
+async function loadRankingEditsFromSupabase(){
+  if(!supabaseClient){
+    setRankingStatus("Supabase client belum aktif. Data saat ini hanya lokal.", "error");
+    return;
+  }
+  const { data, error } = await supabaseClient
+    .schema(QUESTIONNAIRE_SCHEMA)
+    .from(PROFILE_TABLE)
+    .select("zep_name, full_name, nomor_absen, saran");
+  if(error){
+    if(error.status===404){
+      if(!rankingProfileTableMissing){
+        rankingProfileTableMissing = true;
+        console.error("Tabel public.quiz_student_profiles belum ada. Jalankan query schema terbaru.");
+      }
+      setRankingStatus("Gagal sync cloud: tabel quiz_student_profiles belum ada.", "error");
+    } else {
+      console.error("Gagal memuat profil ranking:", error.message);
+      setRankingStatus(`Gagal sync cloud: ${error.message}`, "error");
+    }
+    return;
+  }
+  (data||[]).forEach(row=>{
+    const st = students.find(s=>normalizeName(s.zep)===normalizeName(row.zep_name));
+    if(!st) return;
+    st.fullName = row.full_name || st.fullName || "";
+    st.absen = row.nomor_absen || st.absen || "";
+    st.qSaran = row.saran || st.qSaran || "";
+  });
+  saveState();
+  renderTable();
+  setRankingStatus(`Sinkron cloud berhasil (${(data||[]).length} data profil).`, "success");
+}
+
+async function saveRankingEditToSupabase(student){
+  if(!supabaseClient || !student){
+    return { ok:false, msg:"Gagal simpan cloud: Supabase belum aktif." };
+  }
+  const payload = {
+    zep_name: student.zep,
+    full_name: student.fullName || "",
+    nomor_absen: student.absen || "",
+    saran: student.qSaran || ""
+  };
+  const { error } = await supabaseClient
+    .schema(QUESTIONNAIRE_SCHEMA)
+    .from(PROFILE_TABLE)
+    .upsert(payload, { onConflict: "zep_name" });
+  if(error){
+    if(error.status===404){
+      if(!rankingProfileTableMissing){
+        rankingProfileTableMissing = true;
+        console.error("Tabel public.quiz_student_profiles belum ada. Jalankan query schema terbaru.");
+      }
+      return { ok:false, msg:"Gagal simpan cloud: tabel quiz_student_profiles belum ada." };
+    } else {
+      console.error("Gagal menyimpan profil ranking:", error.message);
+      return { ok:false, msg:`Gagal simpan cloud: ${error.message}` };
+    }
+  }
+  return { ok:true, msg:"Success: data berhasil tersimpan ke cloud." };
+}
+
+async function deleteRankingEditFromSupabase(student){
+  if(!supabaseClient || !student){
+    return { ok:false, msg:"Gagal hapus cloud: Supabase belum aktif." };
+  }
+  const { error } = await supabaseClient
+    .schema(QUESTIONNAIRE_SCHEMA)
+    .from(PROFILE_TABLE)
+    .delete()
+    .eq("zep_name", student.zep);
+  if(error){
+    if(error.status===404){
+      if(!rankingProfileTableMissing){
+        rankingProfileTableMissing = true;
+        console.error("Tabel public.quiz_student_profiles belum ada. Jalankan query schema terbaru.");
+      }
+      return { ok:false, msg:"Gagal hapus cloud: tabel quiz_student_profiles belum ada." };
+    } else {
+      console.error("Gagal menghapus profil ranking:", error.message);
+      return { ok:false, msg:`Gagal hapus cloud: ${error.message}` };
+    }
+  }
+  return { ok:true, msg:"Success: data cloud berhasil dihapus." };
+}
+
 async function initQuestionnaire() {
+  await loadRankingEditsFromSupabase();
   await loadQuestionnaireFromSupabase();
   if(questionnaireData.length===0){
     questionnaireData = parseQuestionnaireCsv(DEFAULT_Q_CSV);
@@ -971,6 +1068,17 @@ function showQuestionText(index){
   const question = Q_FULL_LABELS[index] || "";
   if(!question) return;
   alert(question);
+}
+
+function setRankingStatus(msg, type){
+  const el = document.getElementById("rankingSaveStatus");
+  if(!el) return;
+  el.textContent = msg || "";
+  el.style.color = type==="success" ? "#047857" : type==="error" ? "#b91c1c" : "var(--muted)";
+  if(rankingStatusTimer) clearTimeout(rankingStatusTimer);
+  rankingStatusTimer = setTimeout(()=>{
+    el.textContent = "";
+  }, 7000);
 }
 
 // ================================================================
