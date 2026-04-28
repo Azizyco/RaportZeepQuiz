@@ -859,7 +859,9 @@ function parseQuestionnaireCsv(text) {
 }
 
 function applyCsvInput() {
-  const text = document.getElementById("qCsvInput").value;
+  const inputEl = document.getElementById("qCsvInput");
+  if(!inputEl) return;
+  const text = inputEl.value;
   questionnaireData = parseQuestionnaireCsv(text);
   renderQuestionnaire();
   setQStatus(`Data CSV dipakai. Total responden: ${questionnaireData.length}.`);
@@ -867,6 +869,11 @@ function applyCsvInput() {
 
 function setQStatus(msg, isError) {
   const el = document.getElementById("qStatus");
+  if(!el){
+    if(isError) console.error(msg);
+    else console.log(msg);
+    return;
+  }
   el.textContent = msg;
   el.style.color = isError ? "#b91c1c" : "var(--muted)";
 }
