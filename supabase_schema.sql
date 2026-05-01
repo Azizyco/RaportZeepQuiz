@@ -229,4 +229,5 @@ VALUES
   ('28/04/2026 13:14:06','Marhamah Az Zahro','16',3,3,4,3,3,3,3,3,3,3,''),
   ('28/04/2026 13:14:19','Dzakiyya Nur Azizah','12',2,3,3,3,3,3,3,4,3,2,'ofc, imo seru sih ✌🏻 tapi balik lagi ke pribadi masing-masing.'),
   ('28/04/2026 13:14:24','NAOMI FRISKA MAHARANI','20',4,3,3,2,2,3,4,3,3,2,'saran engga semua orang punya paket data jadi pelajaran menggunakan ZEP Quiz kurang bagi saya'),
-  ('28/04/2026 13:15:53','Septi','27',2,2,4,3,1,3,4,2,4,3,'Cyiberstallking mengantin pantiutas darly');
+  ('28/04/2026 13:15:53','Septi','27',2,2,4,3,1,3,4,2,4,3,'Cyiberstallking mengantin pantiutas darly'),
+  ('28/04/2026 21:14:06','Aufaridho Zulfaadis Zulkarnain','05',3,4,3,4,3,4,3,3,4,4,'');
