@@ -300,10 +300,8 @@ tbody tr:hover { background:#f0f9ff !important; }
       <h3 style="margin:28px 0 12px;font-size:15px;">Preview Lembar Kerja (Soal & Jawaban)</h3>
       <div class="preview-wrap">
         <div class="preview-top">
-          <input type="file" id="worksheetPdfInput" accept="application/pdf" style="display:none">
-          <button class="btn btn-primary" id="worksheetPickBtn" type="button">Pilih PDF</button>
           <button class="btn btn-secondary" id="worksheetOpenBtn" type="button">Buka di Tab Baru</button>
-          <span class="preview-hint" id="worksheetHint">Belum ada PDF dipilih.</span>
+          <span class="preview-hint" id="worksheetHint" style="margin-left:8px">Memuat lembar kerja...</span>
         </div>
         <iframe id="worksheetFrame" class="preview-frame" title="Preview lembar kerja PDF"></iframe>
       </div>
@@ -463,7 +461,7 @@ const editState = {};
 let rankingProfileTableMissing = false;
 let rankingStatusTimer = null;
 let rankingToastTimer = null;
-let worksheetPdfUrl = "";
+let worksheetPdfUrl = "./worksheet.pdf";
 
 // Load saved edits from localStorage
 function loadState() {
@@ -1142,36 +1140,21 @@ function setRankingStatus(msg, type){
 }
 
 function initWorksheetPreview(){
-  const input = document.getElementById("worksheetPdfInput");
-  const pickBtn = document.getElementById("worksheetPickBtn");
   const openBtn = document.getElementById("worksheetOpenBtn");
   const frame = document.getElementById("worksheetFrame");
   const hint = document.getElementById("worksheetHint");
-  if(!input || !pickBtn || !openBtn || !frame || !hint) return;
+  if(!openBtn || !frame || !hint) return;
 
-  pickBtn.addEventListener("click", ()=> input.click());
+  frame.src = worksheetPdfUrl;
+  hint.textContent = "Lembar kerja berhasil dimuat dari repository.";
+  hint.style.color = "#047857";
 
-  input.addEventListener("change", (e)=>{
-    const file = e.target.files && e.target.files[0];
-    if(!file) return;
-    if(file.type !== "application/pdf"){
-      hint.textContent = "File bukan PDF. Pilih file dengan format .pdf";
-      hint.style.color = "#b91c1c";
-      return;
-    }
-    if(worksheetPdfUrl) URL.revokeObjectURL(worksheetPdfUrl);
-    worksheetPdfUrl = URL.createObjectURL(file);
-    frame.src = worksheetPdfUrl;
-    hint.textContent = `Preview aktif: ${file.name}`;
-    hint.style.color = "var(--muted)";
+  frame.addEventListener("error", ()=>{
+    hint.textContent = "File worksheet.pdf tidak ditemukan di repository. Push file ke GitHub.";
+    hint.style.color = "#b91c1c";
   });
 
   openBtn.addEventListener("click", ()=>{
-    if(!worksheetPdfUrl){
-      hint.textContent = "Pilih PDF dulu sebelum buka tab baru.";
-      hint.style.color = "#b91c1c";
-      return;
-    }
     window.open(worksheetPdfUrl, "_blank", "noopener,noreferrer");
   });
 }
